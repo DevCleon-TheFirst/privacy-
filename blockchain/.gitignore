@@ -1,0 +1,12 @@
+# Blockchain layer
+node_modules/
+artifacts/
+cache/
+typechain-types/
+
+# Environment
+.env
+
+# Coverage
+coverage/
+coverage.json

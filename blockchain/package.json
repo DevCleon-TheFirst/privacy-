@@ -1,0 +1,18 @@
+{
+  "name": "privacy-blockchain",
+  "version": "1.0.0",
+  "description": "Smart contract layer for the Privacy-Enhanced Blockchain App",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "coverage": "npx hardhat coverage",
+    "node": "npx hardhat node",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.6.1",
+    "hardhat": "^2.28.6"
+  }
+}
