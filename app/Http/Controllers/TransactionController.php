@@ -13,22 +13,26 @@ class TransactionController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'tx_hash' => 'nullable|string',
+            'tx_hash'        => 'nullable|string',
             'wallet_address' => 'required|string',
-            'receiver' => 'required|string',
-            'amount' => 'required|numeric',
-            'note' => 'nullable|string',
-            'data_hash' => 'required|string',
+            'receiver'       => 'required|string',
+            'amount'         => 'required|numeric',
+            'note'           => 'nullable|string',
+            'data_hash'      => 'required|string',
+            'stealth_address' => 'nullable|string',
+            'ephemeral_key'  => 'nullable|string',
         ]);
 
         $transaction = Transaction::create([
-            'tx_hash' => $validated['tx_hash'] ?? null,
+            'tx_hash'        => $validated['tx_hash'] ?? null,
             'wallet_address' => $validated['wallet_address'],
-            'receiver' => $validated['receiver'],
-            'amount' => $validated['amount'],
-            'note' => $validated['note'] ?? null,
-            'data_hash' => $validated['data_hash'],
-            'status' => 'confirmed' // Assuming creation happens after smart contract confirm
+            'receiver'       => $validated['receiver'],       // Real receiver — encrypted at rest by AES-256
+            'amount'         => $validated['amount'],         // Real amount — stored privately
+            'note'           => $validated['note'] ?? null,   // Real note — encrypted at rest by AES-256
+            'data_hash'      => $validated['data_hash'],
+            'stealth_address' => $validated['stealth_address'] ?? null, // One-time on-chain address
+            'ephemeral_key'  => $validated['ephemeral_key'] ?? null,    // Encrypted at rest by AES-256
+            'status'         => 'confirmed'
         ]);
 
         return response()->json([

@@ -4,9 +4,9 @@ import { ethers } from "ethers";
 export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
 export const CONTRACT_ABI = [
-  "function sendTransaction(address _receiver, bytes32 _dataHash) external payable",
+  "function sendTransaction(address _stealthReceiver, bytes32 _amountHash, bytes32 _dataHash) external payable",
   "function getTransactionCount() external view returns (uint256)",
-  "event TransactionRecorded(uint256 indexed id, address indexed sender, address indexed receiver, uint256 amount, bytes32 dataHash, uint256 timestamp)"
+  "event TransactionRecorded(uint256 indexed id, address indexed sender, address indexed stealthReceiver, bytes32 amountHash, bytes32 dataHash, uint256 timestamp)"
 ];
 
 /**

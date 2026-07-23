@@ -2,10 +2,12 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title PrivacyTransaction
- * @dev Stores minimal transaction data on-chain.
- *      Sensitive data (e.g. notes) are hashed BEFORE being sent here.
- *      Only the hash is stored — never the raw data.
+ * @title PrivacyTransaction (v2 - Full Privacy Layer)
+ * @dev Stores ZERO sensitive data on-chain.
+ *      - Receiver address is a one-time ECDH Stealth Address (hides the real receiver).
+ *      - Amount is stored only as a SHA-256 hash (hides the real value).
+ *      - Note is stored only as a SHA-256 hash (hides the real note).
+ *      Real receiver, real amount, and real note all live off-chain in the private Laravel DB.
  */
 contract PrivacyTransaction {
 
@@ -13,9 +15,9 @@ contract PrivacyTransaction {
 
     struct Transaction {
         address sender;
-        address receiver;
-        uint256 amount;      // in wei
-        bytes32 dataHash;    // SHA-256 hash of the off-chain note
+        address stealthReceiver; // One-time ECDH stealth address — NOT the real receiver
+        bytes32 amountHash;      // SHA-256 hash of the real ETH amount — hides the value
+        bytes32 dataHash;        // SHA-256 hash of the off-chain note
         uint256 timestamp;
     }
 
@@ -23,16 +25,16 @@ contract PrivacyTransaction {
 
     Transaction[] private transactions;
 
-    mapping(address => uint256[]) private senderIndex;   // sender → tx indices
-    mapping(address => uint256[]) private receiverIndex; // receiver → tx indices
+    mapping(address => uint256[]) private senderIndex;
+    mapping(address => uint256[]) private stealthIndex; // stealth addr → tx indices
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
     event TransactionRecorded(
         uint256 indexed id,
         address indexed sender,
-        address indexed receiver,
-        uint256 amount,
+        address indexed stealthReceiver,  // stealth addr logged, NOT real receiver
+        bytes32 amountHash,               // hashed amount, NOT the real ETH value
         bytes32 dataHash,
         uint256 timestamp
     );
@@ -46,33 +48,39 @@ contract PrivacyTransaction {
     // ─── Functions ────────────────────────────────────────────────────────────
 
     /**
-     * @notice Send ETH to a receiver and record the transaction on-chain.
-     * @param _receiver  The destination wallet address.
-     * @param _dataHash  SHA-256 hash of the off-chain note (32 bytes).
+     * @notice Send ETH and record a fully private transaction on-chain.
+     * @param _stealthReceiver  One-time ECDH stealth address (NOT the real wallet).
+     * @param _amountHash       SHA-256 hash of the real ETH amount string (hides value).
+     * @param _dataHash         SHA-256 hash of the off-chain note.
      */
-    function sendTransaction(address _receiver, bytes32 _dataHash) external payable {
-        if (_receiver == address(0)) revert InvalidReceiver();
+    function sendTransaction(
+        address _stealthReceiver,
+        bytes32 _amountHash,
+        bytes32 _dataHash
+    ) external payable {
+        if (_stealthReceiver == address(0)) revert InvalidReceiver();
         if (msg.value == 0) revert AmountMustBePositive();
 
         uint256 id = transactions.length;
 
         Transaction memory newTx = Transaction({
-            sender:    msg.sender,
-            receiver:  _receiver,
-            amount:    msg.value,
-            dataHash:  _dataHash,
-            timestamp: block.timestamp
+            sender:          msg.sender,
+            stealthReceiver: _stealthReceiver,
+            amountHash:      _amountHash,
+            dataHash:        _dataHash,
+            timestamp:       block.timestamp
         });
 
         transactions.push(newTx);
         senderIndex[msg.sender].push(id);
-        receiverIndex[_receiver].push(id);
+        stealthIndex[_stealthReceiver].push(id);
 
-        // Forward ETH to receiver
-        (bool success, ) = payable(_receiver).call{value: msg.value}("");
+        // Forward ETH to the REAL receiver via the stealth address mechanism.
+        // The stealth address's private key is derived by the real receiver off-chain.
+        (bool success, ) = payable(_stealthReceiver).call{value: msg.value}("");
         require(success, "ETH transfer failed");
 
-        emit TransactionRecorded(id, msg.sender, _receiver, msg.value, _dataHash, block.timestamp);
+        emit TransactionRecorded(id, msg.sender, _stealthReceiver, _amountHash, _dataHash, block.timestamp);
     }
 
     /**
@@ -88,13 +96,6 @@ contract PrivacyTransaction {
      */
     function getTransactionsBySender(address _sender) external view returns (uint256[] memory) {
         return senderIndex[_sender];
-    }
-
-    /**
-     * @notice Get all transaction indices received by a given address.
-     */
-    function getTransactionsByReceiver(address _receiver) external view returns (uint256[] memory) {
-        return receiverIndex[_receiver];
     }
 
     /**

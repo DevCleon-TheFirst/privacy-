@@ -16,15 +16,19 @@ class Transaction extends Model
         'amount',
         'note',
         'data_hash',
+        'stealth_address',
+        'ephemeral_key',
         'status',
     ];
 
     /**
      * The attributes that should be cast.
-     * This automatically encrypts the note in the database using AES-256,
-     * fulfilling the data confidentiality requirement of the research paper.
+     * AES-256 encryption is applied to all sensitive off-chain fields.
+     * Even if the database is compromised, these fields remain encrypted at rest.
      */
     protected $casts = [
-        'note' => 'encrypted',
+        'note'           => 'encrypted', // Encrypts the private note in the DB
+        'receiver'       => 'encrypted', // Encrypts the real receiver address
+        'ephemeral_key'  => 'encrypted', // Encrypts the ephemeral key
     ];
 }

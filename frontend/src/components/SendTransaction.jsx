@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { useWallet } from "../hooks/useWallet";
 import { getContract } from "../utils/contract";
 import { hashData } from "../utils/hashData";
+import { generateStealthAddress, hashAmount } from "../utils/stealth";
 import { saveTransactionOffChain } from "../services/api";
 
 export default function SendTransaction({ onTransactionSuccess }) {
@@ -44,23 +45,29 @@ export default function SendTransaction({ onTransactionSuccess }) {
       setStatus({ type: "loading", msg: "Hashing private memo locally..." });
       const dataHash = await hashData(note);
 
-      // 3. Send transaction to Blockchain
+      // 3. Generate a one-time Stealth Address (hides the real receiver on-chain)
+      setStatus({ type: "loading", msg: "Generating stealth address for receiver..." });
+      const { stealthAddress, ephemeralKey } = await generateStealthAddress(receiver, account);
+
+      // 4. Hash the ETH amount (hides the real value on-chain)
+      const amountHash = await hashAmount(amount);
+
+      // 5. Send transaction to Blockchain — stealth address + amount hash, NOT real values
       setStatus({ type: "loading", msg: "Requesting wallet signature..." });
       
       const amountWei = ethers.parseEther(amount);
       const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
 
-      // NOTE: Bypassing the Ethers 'Contract' object completely to avoid the 'sendTransaction' 
-      // built-in naming conflict. We manually encode the data and send via the raw signer.
-      const abi = ["function sendTransaction(address _receiver, bytes32 _dataHash) external payable"];
+      // Encode the new v2 function call with stealthReceiver + amountHash + dataHash
+      const abi = ["function sendTransaction(address _stealthReceiver, bytes32 _amountHash, bytes32 _dataHash) external payable"];
       const iface = new ethers.Interface(abi);
-      const txData = iface.encodeFunctionData("sendTransaction", [receiver, dataHash]);
+      const txData = iface.encodeFunctionData("sendTransaction", [stealthAddress, amountHash, dataHash]);
 
       const tx = await signer.sendTransaction({
         to: contractAddress,
         data: txData,
         value: amountWei,
-        gasLimit: 500000n, // Increased limit to prevent Out Of Gas reverts during storage writes
+        gasLimit: 500000n,
       });
 
       setStatus({ type: "loading", msg: "Awaiting block confirmation..." });
@@ -68,14 +75,16 @@ export default function SendTransaction({ onTransactionSuccess }) {
 
       setStatus({ type: "loading", msg: "Encrypting and saving off-chain..." });
 
-      // 4. Save the full tracking details to Laravel API privately
+      // 6. Save FULL private details to Laravel API off-chain (real receiver, real amount, real note)
       await saveTransactionOffChain({
-        tx_hash: receipt.hash,
+        tx_hash:        receipt.hash,
         wallet_address: account,
-        receiver: receiver,
-        amount: amount,
-        note: note,
-        data_hash: dataHash,
+        receiver:       receiver,        // Real receiver — stored privately off-chain ONLY
+        amount:         amount,          // Real amount — stored privately off-chain ONLY
+        note:           note,            // Real note — stored privately off-chain ONLY
+        data_hash:      dataHash,        // Used for on-chain verification
+        stealth_address: stealthAddress, // Stored so receiver can claim funds
+        ephemeral_key:   ephemeralKey,   // Stored so receiver can derive stealth private key
       });
 
       setStatus({ type: "success", msg: "Transaction successfully secured." });
