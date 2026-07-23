@@ -14,7 +14,7 @@ export default function SendTransaction({ onTransactionSuccess }) {
   const [status, setStatus] = useState({ type: "", msg: "" });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const SEPOLIA_CHAIN_ID = 11155111n;
+  const LOCALHOST_CHAIN_ID = 31337n;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,12 +30,12 @@ export default function SendTransaction({ onTransactionSuccess }) {
         return;
       }
 
-      // 1. Network check — must be on Sepolia
+      // 1. Network check — must be on Localhost
       const network = await signer.provider.getNetwork();
-      if (network.chainId !== SEPOLIA_CHAIN_ID) {
+      if (network.chainId !== LOCALHOST_CHAIN_ID) {
         setStatus({
           type: "error",
-          msg: `Wrong network! You are on chain ID ${network.chainId}. Please switch MetaMask to the Sepolia Testnet (chain ID 11155111).`,
+          msg: `Wrong network! You are on chain ID ${network.chainId}. Please switch MetaMask to Localhost 8545 (chain ID 31337).`,
         });
         setIsProcessing(false);
         return;

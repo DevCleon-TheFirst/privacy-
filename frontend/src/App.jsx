@@ -54,7 +54,7 @@ createWeb3Modal({
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <WalletProvider>
         <div className="min-h-screen bg-[#0a0a0b] text-gray-100 font-sans selection:bg-white selection:text-black flex flex-col">
           <Navbar />
